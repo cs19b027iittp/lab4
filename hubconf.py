@@ -1,116 +1,168 @@
-"""# Import libraries"""
-
 import torch
-import torchvision
-from torchvision.datasets import FashionMNIST
+from torch.utils.data import Dataset
+from torchvision import datasets
 from torchvision.transforms import ToTensor
-import numpy as np
+import matplotlib.pyplot as plt
 
-"""# Define new labels"""
 
-new_labels = {
-    0: 'Upper',
-    1: 'Lower',
-    2: 'Feet',
-    3: 'Bag'
+training_data = datasets.FashionMNIST(
+    root="data",
+    train=True,
+    download=True,
+    transform=ToTensor()
+)
+
+test_data = datasets.FashionMNIST(
+    root="data",
+    train=False,
+    download=True,
+    transform=ToTensor()
+)
+
+labels_map = {
+    0: "T-Shirt",
+    1: "Trouser",
+    2: "Pullover",
+    3: "Dress",
+    4: "Coat",
+    5: "Sandal",
+    6: "Shirt",
+    7: "Sneaker",
+    8: "Bag",
+    9: "Ankle Boot",
 }
+figure = plt.figure(figsize=(8, 8))
+cols, rows = 3, 3
+for i in range(1, cols * rows + 1):
+    sample_idx = torch.randint(len(training_data), size=(1,)).item()
+    img, label = training_data[sample_idx]
+    figure.add_subplot(rows, cols, i)
+    plt.title(labels_map[label])
+    plt.axis("off")
+    plt.imshow(img.squeeze(), cmap="gray")
+plt.show()
 
-"""# Define label mapping"""
+import os
+import pandas as pd
+from torchvision.io import read_image
 
-label_mapping = {
-    0: [0, 1, 4, 6],
-    1: [2, 3],
-    2: [5, 7, 9],
-    3: [8]
-}
+class CustomImageDataset(Dataset):
+    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+        self.img_labels = pd.read_csv(annotations_file)
+        self.img_dir = img_dir
+        self.transform = transform
+        self.target_transform = target_transform
 
-"""# Load the Fashion-MNIST dataset and apply new labels"""
-
-fmnist_train = FashionMNIST(root="./data", train=True, download=True, transform=ToTensor())
-fmnist_test = FashionMNIST(root="./data", train=False, download=True, transform=ToTensor())
-
-new_train_data = []
-new_train_labels = []
-new_test_data = []
-new_test_labels = []
-
-"""# Map the original labels to new labels"""
-
-for i, (data, label) in enumerate(fmnist_train):
-    for new_label, orig_labels in label_mapping.items():
-        if label in orig_labels:
-            new_train_data.append(data)
-            new_train_labels.append(new_label)
-            break
-
-for i, (data, label) in enumerate(fmnist_test):
-    for new_label, orig_labels in label_mapping.items():
-        if label in orig_labels:
-            new_test_data.append(data)
-            new_test_labels.append(new_label)
-            break
-
-"""# Convert the data and labels to PyTorch tensors"""
-
-new_train_data = torch.stack(new_train_data, dim=0)
-new_train_labels = torch.tensor(new_train_labels)
-new_test_data = torch.stack(new_test_data, dim=0)
-new_test_labels = torch.tensor(new_test_labels)
-
-"""# Create the custom dataset"""
-
-class CustomFashionMNIST(torch.utils.data.Dataset):
-    def __init__(self, data, labels):
-        super(CustomFashionMNIST, self).__init__()
-        self.data = data
-        self.labels = labels
-    
-    def __getitem__(self, index):
-        return self.data[index], self.labels[index]
-    
     def __len__(self):
-        return len(self.data)
-    
-for i, (data, label) in enumerate(fmnist_train):
-    for new_label, orig_labels in label_mapping.items():
-        if label in orig_labels:
-            new_train_data.append(data)
-            new_train_labels.append(new_label)
-            break
-            
-for i, (data, label) in enumerate(fmnist_test):
-    for new_label, orig_labels in label_mapping.items():
-        if label in orig_labels:
-            new_test_data.append(data)
-            new_test_labels.append(new_label)
-            break            
-train_dataset = CustomFashionMNIST(new_train_data, new_train_labels)
-test_dataset = CustomFashionMNIST(new_test_data, new_test_labels)
+        return len(self.img_labels)
 
-"""# Reconfigure the neural network"""
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
+        image = read_image(img_path)
+        label = self.img_labels.iloc[idx, 1]
+        if self.transform:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
 
-class Net(torch.nn.Module):
+def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+    self.img_labels = pd.read_csv(annotations_file)
+    self.img_dir = img_dir
+    self.transform = transform
+    self.target_transform = target_transform
+
+def __len__(self):
+    return len(self.img_labels)
+
+def __getitem__(self, idx):
+    img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
+    image = read_image(img_path)
+    label = self.img_labels.iloc[idx, 1]
+    if self.transform:
+        image = self.transform(image)
+    if self.target_transform:
+        label = self.target_transform(label)
+    return image, label
+
+from torch.utils.data import DataLoader
+
+train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
+test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
+
+# Display image and label.
+train_features, train_labels = next(iter(train_dataloader))
+print(f"Feature batch shape: {train_features.size()}")
+print(f"Labels batch shape: {train_labels.size()}")
+img = train_features[0].squeeze()
+label = train_labels[0]
+plt.imshow(img, cmap="gray")
+plt.show()
+print(f"Label: {label}")
+
+import os
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using {device} device")
+
+class NeuralNetwork(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = torch.nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = torch.nn.Conv2d(10, 20, kernel_size=5)
-        self.fc1 = torch.nn.Linear(320, 50)
-        self.fc2 = torch.nn.Linear(50, 4) # 4 neurons for the 4 new labels
-    
+        super(NeuralNetwork, self).__init__()
+        self.flatten = nn.Flatten()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(28*28, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 10),
+        )
+
     def forward(self, x):
-        x = torch.nn.functional.relu(torch.nn.functional.max_pool2d(self.conv1(x), 2))
-        x = torch.nn.functional.relu(torch.nn.functional.max_pool2d(self.conv2(x), 2))
-        x = x.view(-1, 320)
-        x = torch.nn.functional.relu(self.fc1(x))
-        x = self.fc2(x)
-        return torch.nn.functional.log_softmax(x, dim=1)
+        x = self.flatten(x)
+        logits = self.linear_relu_stack(x)
+        return logits
 
-net = Net()
+model = NeuralNetwork().to(device)
+print(model)
 
-criterion = torch.nn.CrossEntropyLoss()
+X = torch.rand(1, 28, 28, device=device)
+logits = model(X)
+pred_probab = nn.Softmax(dim=1)(logits)
+y_pred = pred_probab.argmax(1)
+print(f"Predicted class: {y_pred}")
 
-optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.5)
+input_image = torch.rand(3,28,28)
+print(input_image.size())
 
-"""# Train the neural network"""
+flatten = nn.Flatten()
+flat_image = flatten(input_image)
+print(flat_image.size())
 
-train_loader = torch.utils.data
+layer1 = nn.Linear(in_features=28*28, out_features=20)
+hidden1 = layer1(flat_image)
+print(hidden1.size())
+
+print(f"Before ReLU: {hidden1}\n\n")
+hidden1 = nn.ReLU()(hidden1)
+print(f"After ReLU: {hidden1}")
+
+seq_modules = nn.Sequential(
+    flatten,
+    layer1,
+    nn.ReLU(),
+    nn.Linear(20, 10)
+)
+input_image = torch.rand(3,28,28)
+logits = seq_modules(input_image)
+
+softmax = nn.Softmax(dim=1)
+pred_probab = softmax(logits)
+
+print(f"Model structure: {model}\n\n")
+
+for name, param in model.named_parameters():
+    print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
