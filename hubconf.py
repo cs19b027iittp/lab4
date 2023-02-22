@@ -1,114 +1,27 @@
 import torch
-from torch.utils.data import Dataset
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-import matplotlib.pyplot as plt
-
-
-training_data = datasets.FashionMNIST(
-    root="data",
-    train=True,
-    download=True,
-    transform=ToTensor()
-)
-
-test_data = datasets.FashionMNIST(
-    root="data",
-    train=False,
-    download=True,
-    transform=ToTensor()
-)
-
-labels_map = {
-    0: "T-Shirt",
-    1: "Trouser",
-    2: "Pullover",
-    3: "Dress",
-    4: "Coat",
-    5: "Sandal",
-    6: "Shirt",
-    7: "Sneaker",
-    8: "Bag",
-    9: "Ankle Boot",
-}
-figure = plt.figure(figsize=(8, 8))
-cols, rows = 3, 3
-for i in range(1, cols * rows + 1):
-    sample_idx = torch.randint(len(training_data), size=(1,)).item()
-    img, label = training_data[sample_idx]
-    figure.add_subplot(rows, cols, i)
-    plt.title(labels_map[label])
-    plt.axis("off")
-    plt.imshow(img.squeeze(), cmap="gray")
-plt.show()
-
-import os
-import pandas as pd
-from torchvision.io import read_image
-
-class CustomImageDataset(Dataset):
-    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
-        self.img_labels = pd.read_csv(annotations_file)
-        self.img_dir = img_dir
-        self.transform = transform
-        self.target_transform = target_transform
-
-    def __len__(self):
-        return len(self.img_labels)
-
-    def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-        image = read_image(img_path)
-        label = self.img_labels.iloc[idx, 1]
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            label = self.target_transform(label)
-        return image, label
-
-def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
-    self.img_labels = pd.read_csv(annotations_file)
-    self.img_dir = img_dir
-    self.transform = transform
-    self.target_transform = target_transform
-
-def __len__(self):
-    return len(self.img_labels)
-
-def __getitem__(self, idx):
-    img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-    image = read_image(img_path)
-    label = self.img_labels.iloc[idx, 1]
-    if self.transform:
-        image = self.transform(image)
-    if self.target_transform:
-        label = self.target_transform(label)
-    return image, label
-
-from torch.utils.data import DataLoader
-
-train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
-test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
-
-# Display image and label.
-train_features, train_labels = next(iter(train_dataloader))
-print(f"Feature batch shape: {train_features.size()}")
-print(f"Labels batch shape: {train_labels.size()}")
-img = train_features[0].squeeze()
-label = train_labels[0]
-plt.imshow(img, cmap="gray")
-plt.show()
-print(f"Label: {label}")
-
-import os
-import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
+# Get cpu or gpu device for training.
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
+classes = [
+    "T-shirt/top",
+    "Trouser",
+    "Pullover",
+    "Dress",
+    "Coat",
+    "Sandal",
+    "Shirt",
+    "Sneaker",
+    "Bag",
+    "Ankle boot",
+]
+
+# Define model
 class NeuralNetwork(nn.Module):
     def __init__(self):
         super(NeuralNetwork, self).__init__()
@@ -118,7 +31,7 @@ class NeuralNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 512),
             nn.ReLU(),
-            nn.Linear(512, 10),
+            nn.Linear(512, 10)
         )
 
     def forward(self, x):
@@ -126,43 +39,118 @@ class NeuralNetwork(nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
 
-model = NeuralNetwork().to(device)
-print(model)
+#############################
 
-X = torch.rand(1, 28, 28, device=device)
-logits = model(X)
-pred_probab = nn.Softmax(dim=1)(logits)
-y_pred = pred_probab.argmax(1)
-print(f"Predicted class: {y_pred}")
+def get_lossfn_and_optimizer(mymodel):
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(mymodel.parameters(), lr=1e-3)
+    return loss_fn, optimizer
 
-input_image = torch.rand(3,28,28)
-print(input_image.size())
 
-flatten = nn.Flatten()
-flat_image = flatten(input_image)
-print(flat_image.size())
+def load_data():
 
-layer1 = nn.Linear(in_features=28*28, out_features=20)
-hidden1 = layer1(flat_image)
-print(hidden1.size())
+    # Download training data from open datasets.
+    training_data = datasets.FashionMNIST(
+        root="data",
+        train=True,
+        download=True,
+        transform=ToTensor(),
+    )
 
-print(f"Before ReLU: {hidden1}\n\n")
-hidden1 = nn.ReLU()(hidden1)
-print(f"After ReLU: {hidden1}")
+    # Download test data from open datasets.
+    test_data = datasets.FashionMNIST(
+        root="data",
+        train=False,
+        download=True,
+        transform=ToTensor(),
+    )
+    
+    return training_data, test_data
 
-seq_modules = nn.Sequential(
-    flatten,
-    layer1,
-    nn.ReLU(),
-    nn.Linear(20, 10)
-)
-input_image = torch.rand(3,28,28)
-logits = seq_modules(input_image)
+#############################
 
-softmax = nn.Softmax(dim=1)
-pred_probab = softmax(logits)
+def create_dataloaders(training_data, test_data, batch_size=64):
 
-print(f"Model structure: {model}\n\n")
+    # Create data loaders.
+    train_dataloader = DataLoader(training_data, batch_size=batch_size)
+    test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-for name, param in model.named_parameters():
-    print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
+    for X, y in test_dataloader:
+        print(f"Shape of X [N, C, H, W]: {X.shape}")
+        print(f"Shape of y: {y.shape} {y.dtype}")
+        break
+        
+    return train_dataloader, test_dataloader
+  
+#############################
+
+def get_model():
+    
+    model = NeuralNetwork().to(device)
+
+    return model
+
+
+def _train(dataloader, model, loss_fn, optimizer):
+    size = len(dataloader.dataset)
+    model.train()
+    for batch, (X, y) in enumerate(dataloader):
+        X, y = X.to(device), y.to(device)
+
+        # Compute prediction error
+        pred = model(X)
+        loss = loss_fn(pred, y)
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if batch % 100 == 0:
+            loss, current = loss.item(), batch * len(X)
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            
+def _test(dataloader, model, loss_fn):
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    model.eval()
+    test_loss, correct = 0, 0
+    with torch.no_grad():
+        for X, y in dataloader:
+            X, y = X.to(device), y.to(device)
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
+            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+    test_loss /= num_batches
+    correct /= size
+    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    
+def train(train_dataloader, test_dataloader, model1, loss_fn1, optimizer1, epochs=5):
+    for t in range(epochs):
+        print(f"Epoch {t+1}\n-------------------------------")
+        _train(train_dataloader, model1, loss_fn1, optimizer1)
+        _test(test_dataloader, model1, loss_fn1)
+    print("Done!")
+    return model1
+
+def save_model(model1,mypath="model.pth"):
+    torch.save(model1.state_dict(), "model.pth")
+    print("Saved PyTorch Model State to model.pth")
+
+def load_model(mypath="model.pth"):
+    model = NeuralNetwork()
+    model.load_state_dict(torch.load("model.pth"))
+    return model
+
+
+def sample_test(model1, test_data):
+    model1.eval()
+    x, y = test_data[0][0], test_data[0][1]
+    with torch.no_grad():
+        pred = model1(x)
+        predicted, actual = classes[pred[0].argmax(0)], classes[y]
+        print(f'Predicted: "{predicted}", Actual: "{actual}"')
+        
+        
+        
+    
