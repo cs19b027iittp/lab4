@@ -70,7 +70,20 @@ class CustomFashionMNIST(torch.utils.data.Dataset):
     
     def __len__(self):
         return len(self.data)
-
+    
+for i, (data, label) in enumerate(fmnist_train):
+    for new_label, orig_labels in label_mapping.items():
+        if label in orig_labels:
+            new_train_data.append(data)
+            new_train_labels.append(new_label)
+            break
+            
+for i, (data, label) in enumerate(fmnist_test):
+    for new_label, orig_labels in label_mapping.items():
+        if label in orig_labels:
+            new_test_data.append(data)
+            new_test_labels.append(new_label)
+            break            
 train_dataset = CustomFashionMNIST(new_train_data, new_train_labels)
 test_dataset = CustomFashionMNIST(new_test_data, new_test_labels)
 
